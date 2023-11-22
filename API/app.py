@@ -1,7 +1,8 @@
 import os
 import psycopg2
 from dotenv import load_dotenv
-from flask import Flask, request
+from flask import Flask, render_template, redirect, url_for, request, jsonify
+from flask_cors import CORS
 
 load_dotenv()
 url = os.getenv('DATABASE_URL')
@@ -21,6 +22,7 @@ DELETE_TEMP_FROM_ID = "DELETE FROM temperatures WHERE id = %s;"
 INSERT_TEMP = "INSERT INTO temperatures (room_id, temperature, date) VALUES (%s, %s, %s);"
 
 app = Flask(__name__)
+CORS(app)
 
 def initialize_database():
     with connection:
@@ -29,15 +31,17 @@ def initialize_database():
             cursor.execute(CREATE_TEMPS_TABLE)
 
 
-@app.get("/test")
-def test():
-    return "Ceci est un test."
-
-
-@app.get("/")
+@app.route('/')
 def home():
-    print("toto")
-    return "Bonjour les amis!"
+    return render_template('home.html')
+
+@app.route('/temperatures')
+def view_temperatures():
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT * FROM temperatures;")
+            temperatures = cursor.fetchall()
+    return render_template('temperatures.html', temperatures=temperatures)
 
 # Exemple de même route avec type de requête différente
 @app.post("/")
@@ -104,13 +108,27 @@ def create_room():
             room_id = cursor.fetchone()[0]
     return {"id": room_id, "message": f"Room {name} created."}, 201
 
-@app.get("/api/room/<id>/temperatures")
-def get_temperatures_by_room_id(id):
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute(GET_TEMPS_FROM_ROOM_ID, (int(id),))
-            temperatures = cursor.fetchall()
-    return temperatures
+@app.get("/api/room/<room_id>/temperatures")
+def get_temperatures_by_room_id(room_id):
+    try:
+        # Créez une nouvelle connexion spécifique pour cette route
+        temp_connection = psycopg2.connect(url)
+        with temp_connection:
+            with temp_connection.cursor() as cursor:
+                cursor.execute(GET_TEMPS_FROM_ROOM_ID, (int(room_id),))
+                temperatures = cursor.fetchall()
+
+        print(f"Températures pour la salle {room_id} : {temperatures}")
+
+        return jsonify(temperatures)
+    except Exception as e:
+        print(f"Erreur lors de la récupération des températures : {str(e)}")
+        return jsonify({"error": "Erreur lors de la récupération des températures"})
+    finally:
+        # Assurez-vous de fermer la connexion spécifique
+        temp_connection.close()
+
+
 
 @app.get("/api/room/<room_id>/temperature/<temp_id>")
 def get_temperature_by_id(room_id, temp_id):
