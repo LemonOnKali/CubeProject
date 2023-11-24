@@ -1,163 +1,134 @@
 import os
-import psycopg2
+import mariadb
+from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
-from flask import Flask, render_template, redirect, url_for, request, jsonify
+from flask_wtf import FlaskForm
+from wtforms import DecimalField, IntegerField, validators
 from flask_cors import CORS
 
 load_dotenv()
-url = os.getenv('DATABASE_URL')
-connection = psycopg2.connect(url)
 
-CREATE_ROOMS_TABLE = "CREATE TABLE IF NOT EXISTS rooms (id SERIAL PRIMARY KEY, name TEXT)"
-CREATE_TEMPS_TABLE = """CREATE TABLE IF NOT EXISTS temperatures (room_id INTEGER, temperature REAL, 
-                        date TIMESTAMP, FOREIGN KEY(room_id) REFERENCES rooms(id) ON DELETE CASCADE);"""
-
-INSERT_ROOM_RETURN_ID = "INSERT INTO rooms (name) VALUES (%s) RETURNING id;"
-GET_ROOM_FROM_ID = "SELECT * FROM rooms WHERE id = (%s);"
-DELETE_ROOM_FROM_ID = "DELETE FROM rooms WHERE id = (%s);"
-
-GET_TEMPS_FROM_ROOM_ID = "SELECT * FROM temperatures WHERE room_id = %s;"
-GET_TEMP_FROM_ID = "SELECT * FROM temperatures WHERE id = %s;"
-DELETE_TEMP_FROM_ID = "DELETE FROM temperatures WHERE id = %s;"
-INSERT_TEMP = "INSERT INTO temperatures (room_id, temperature, date) VALUES (%s, %s, %s);"
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "3307")
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_NAME = os.getenv("DB_NAME", "tjmsa")
 
 app = Flask(__name__)
 CORS(app)
+app.config['SECRET_KEY'] = 'tjmsa123'  # Change this to a secret key for your application
+
+CREATE_DONNEES_TABLE = """
+CREATE TABLE IF NOT EXISTS Donnees (
+   ID INT AUTO_INCREMENT,
+   va_Temperature DECIMAL(5,2),
+   va_Humidite DECIMAL(5,2),
+   va_Pression INT,
+   Date_mesure DATETIME DEFAULT CURRENT_TIMESTAMP,
+   PRIMARY KEY(ID)
+);
+"""
+
+class DonneesForm(FlaskForm):
+    va_Temperature = DecimalField('Température', [validators.DataRequired()])
+    va_Humidite = DecimalField('Humidité', [validators.DataRequired()])
+    va_Pression = IntegerField('Pression', [validators.DataRequired()])
 
 def initialize_database():
-    with connection:
+    with app.app_context():
+        connection = connect_to_database()
         with connection.cursor() as cursor:
-            cursor.execute(CREATE_ROOMS_TABLE)
-            cursor.execute(CREATE_TEMPS_TABLE)
+            cursor.execute(CREATE_DONNEES_TABLE)
+        connection.close()
+
+def connect_to_database():
+    return mariadb.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=int(DB_PORT),
+        database=DB_NAME
+    )
+
+@app.before_request
+def before_request():
+    initialize_database()
 
 
-@app.route('/')
-def home():
-    return render_template('home.html')
+@app.route('/donnees', methods=['GET'])
+def get_all_data():
+    connection = connect_to_database()
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT * FROM Donnees ORDER BY Date_mesure DESC;")
+        all_data = cursor.fetchall()
+    connection.close()
 
-@app.route('/temperatures')
-def view_temperatures():
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM temperatures;")
-            temperatures = cursor.fetchall()
-    return render_template('temperatures.html', temperatures=temperatures)
+    return jsonify(data=all_data)
+@app.route('/donnees')
+def display_page():
+    return render_template('donnees.html')
+@app.route('/donnees', methods=['POST'])
+def add_data():
+    data = request.json
+    temperature = data.get('va_Temperature')
+    humidite = data.get('va_Humidite')
+    pression = data.get('va_Pression')
 
-# Exemple de même route avec type de requête différente
-@app.post("/")
-def home2():
-    print("toto")
-    return "Bonjour les amis! C'est un post"
+    with connect_to_database() as connection, connection.cursor() as cursor:
+        cursor.execute("INSERT INTO Donnees (va_Temperature, va_Humidite, va_Pression) VALUES (%s, %s, %s);",
+                       (temperature, humidite, pression))
+        connection.commit()
 
-# Route pour récupérer les données d'un élément avec son ID (READ de CRUD)
-@app.get("/api/room/<id>")
-def afficher_room_by_id(id):
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute(GET_ROOM_FROM_ID, (int(id),))
-            room = cursor.fetchall()
-    return room
+    return jsonify({"message": "Donnée ajoutée avec succès"}), 201
+@app.route('/donnees/<id>')  
+def get_data_by_id(data_id):
+    with g.connection.cursor() as cursor:
+        cursor.execute("SELECT * FROM Donnees WHERE ID = %s;", (data_id,))
+        data = cursor.fetchone()
+    if data:
+        return jsonify(data)
+    else:
+        return jsonify({"error": "Donnée non trouvée"}), 404
+# CRUD: Update (Mise à jour) - Modifier une donnée par ID
+@app.route('/donnees/<int:data_id>', methods=['PUT'])
+def update_data(data_id):
+    data = request.json
+    temperature = data.get('va_Temperature')
+    humidite = data.get('va_Humidite')
+    pression = data.get('va_Pression')
 
+    with g.connection.cursor() as cursor:
+        # Vérifier d'abord si la donnée existe
+        cursor.execute("SELECT * FROM Donnees WHERE ID = %s;", (data_id,))
+        existing_data = cursor.fetchone()
 
-# Créer une route pour supprimer un élément avec son ID (DELETE de CRUD)*
-# TODO
-@app.delete("/api/room/<id>")
-def delete_room(id):
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute(DELETE_ROOM_FROM_ID, (int(id),))
-            # Vous n'avez probablement pas besoin de récupérer les résultats ici
-    return "La salle a été supprimée avec succès."
+        if not existing_data:
+            return jsonify({"error": "Donnée non trouvée"}), 404
 
-# Idem avec UPDATE pour modifier un élément avec son ID (UPDATE de CRUD)
-#TODO
-# Route pour mettre à jour un élément avec son ID (UPDATE de CRUD)
-@app.put("/api/room/<id>")
-def update_room(id):
-    # Information à mettre dans le JSON sur Postman : { "name": "Nouveau_nom_de_la_salle" }
-    data = request.get_json()
+        # Mettre à jour la donnée
+        cursor.execute("UPDATE Donnees SET va_Temperature=%s, va_Humidite=%s, va_Pression=%s WHERE ID=%s;",
+                       (temperature, humidite, pression, data_id))
+        g.connection.commit()
 
-    # Mettez à jour les informations de la salle avec les données fournies
-    updated_name = data.get("name")
-    if updated_name:
-        with connection:
-            with connection.cursor() as cursor:
-                cursor.execute("UPDATE rooms SET name = %s WHERE id = %s", (updated_name, int(id)))
+    return jsonify({"message": "Donnée mise à jour avec succès"})
 
-    # Retournez un message indiquant que la salle a été mise à jour
-    return {"message": f"Room {id} updated with name {updated_name}."}
+# CRUD: Delete (Suppression) - Supprimer une donnée par ID
+@app.route('/donnees/<int:data_id>', methods=['DELETE'])
+def delete_data(data_id):
+    with g.connection.cursor() as cursor:
+        # Vérifier d'abord si la donnée existe
+        cursor.execute("SELECT * FROM Donnees WHERE ID = %s;", (data_id,))
+        existing_data = cursor.fetchone()
 
+        if not existing_data:
+            return jsonify({"error": "Donnée non trouvée"}), 404
 
+        # Supprimer la donnée
+        cursor.execute("DELETE FROM Donnees WHERE ID=%s;", (data_id,))
+        g.connection.commit()
 
-@app.get("/api/room")
-def get_all_rooms():
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM rooms;")
-            rooms = cursor.fetchall()
-    return rooms
-
-@app.post("/api/room")
-def create_room():
-    data = request.get_json()
-    name = data["name"]
-    print(name)
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute(INSERT_ROOM_RETURN_ID, (name,))
-            room_id = cursor.fetchone()[0]
-    return {"id": room_id, "message": f"Room {name} created."}, 201
-
-@app.get("/api/room/<room_id>/temperatures")
-def get_temperatures_by_room_id(room_id):
-    try:
-        # Créez une nouvelle connexion spécifique pour cette route
-        temp_connection = psycopg2.connect(url)
-        with temp_connection:
-            with temp_connection.cursor() as cursor:
-                cursor.execute(GET_TEMPS_FROM_ROOM_ID, (int(room_id),))
-                temperatures = cursor.fetchall()
-
-        print(f"Températures pour la salle {room_id} : {temperatures}")
-
-        return jsonify(temperatures)
-    except Exception as e:
-        print(f"Erreur lors de la récupération des températures : {str(e)}")
-        return jsonify({"error": "Erreur lors de la récupération des températures"})
-    finally:
-        # Assurez-vous de fermer la connexion spécifique
-        temp_connection.close()
-
-
-
-@app.get("/api/room/<room_id>/temperature/<temp_id>")
-def get_temperature_by_id(room_id, temp_id):
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute(GET_TEMP_FROM_ID, (int(temp_id),))
-            temperature = cursor.fetchall()
-    return temperature
-
-@app.post("/api/room/<id>/temperature")
-def add_temperature(id):
-    # Information à mettre dans le JSON sur Postman : { "temperature": Valeur_de_la_température }
-    data = request.get_json()
-    temperature = data.get("temperature")
-
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute(INSERT_TEMP, (int(id), temperature))
-            temp_id = cursor.fetchone()[0]
-    return {"id": temp_id, "message": f"Temperature {temperature} added to room {id}."}, 201
-
-@app.delete("/api/room/<room_id>/temperature/<temp_value>")
-def delete_temperature(room_id, temp_value):
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute("DELETE FROM temperatures WHERE room_id = %s AND temperature = %s;", (int(room_id), float(temp_value)))
-    return f"Temperature {temp_value} has been deleted from room {room_id}."
+    return jsonify({"message": "Donnée supprimée avec succès"})
 
 if __name__ == '__main__':
-    app.run()
-    initialize_database()  # Appeler la fonction d'initialisation ici
-    app.run(debug=True, host='0.0.0.0')  # Accepter les connexions depuis n'importe quelle adresse IP
+    initialize_database()
+    app.run(debug=True, host='0.0.0.0')

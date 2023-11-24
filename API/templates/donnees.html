@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Données</title>
+</head>
+<body>
+
+    <h1>Données</h1>
+
+    <div id="dataContainer"></div>
+
+    <script>
+        function fetchData() {
+            fetch('/donnees', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Data received:', data);
+                displayData(data.data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        function displayData(data) {
+            console.log('Displaying data:', data);
+            var container = document.getElementById("dataContainer");
+            container.innerHTML = '';
+
+            if (data && data.length > 0) {
+                console.log('Data is available. Proceeding to display.');
+                var list = document.createElement("ul");
+
+                data.forEach(row => {
+                    var listItem = document.createElement("li");
+                    listItem.textContent = `Date: ${row[4]}, Température: ${row[1]}, Humidité: ${row[2]}, Pression: ${row[3]}`;
+                    list.appendChild(listItem);
+                });
+
+                container.appendChild(list);
+            } else {
+                console.log('No data available.');
+            }
+        }
+
+        fetchData(); // Exécutez la fonction fetchData au chargement de la page
+    </script>
+    
+</body>
+</html>
+
+
