@@ -1,60 +1,96 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Données</title>
-</head>
-<body>
-
-    <h1>Données</h1>
-
-    <div id="dataContainer"></div>
-
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Votre Page</title>
+    <!-- ... -->
     <script>
-        function fetchData() {
-            fetch('/donnees', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Data received:', data);
-                displayData(data.data);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+      const URL_API = "http://127.0.0.1:5000/donnees";
+      const ID_LISTE_DONNEE = "data-list";
+      let donnees = {}; // Initialiser avec une valeur par défaut
+
+      function afficherDonnees(data) {
+        const dataList = data.data;
+        let listHTML = "<ul>";
+        for (const data of dataList) {
+          const id = data[0];
+          const va_Temperature = data[1] + " °C";
+          const va_Humidite = data[2] + " %";
+          const va_Pression = data[3] + " Pa";
+
+          listHTML += `<li>ID: ${id}, Température: ${va_Temperature}, Humidité: ${va_Humidite}, Pression: ${va_Pression}</li>`;
         }
+        listHTML += "</ul>";
 
-        function displayData(data) {
-            console.log('Displaying data:', data);
-            var container = document.getElementById("dataContainer");
-            container.innerHTML = '';
+        const dataListElement = document.getElementById(ID_LISTE_DONNEE);
+        dataListElement.innerHTML = listHTML;
+      }
 
-            if (data && data.length > 0) {
-                console.log('Data is available. Proceeding to display.');
-                var list = document.createElement("ul");
-
-                data.forEach(row => {
-                    var listItem = document.createElement("li");
-                    listItem.textContent = `Date: ${row[4]}, Température: ${row[1]}, Humidité: ${row[2]}, Pression: ${row[3]}`;
-                    list.appendChild(listItem);
-                });
-
-                container.appendChild(list);
-            } else {
-                console.log('No data available.');
-            }
+      function filtrerDonnees(data, filtre) {
+        const filteredData = [];
+        for (const dataItem of data) {
+          if (filtre(dataItem)) {
+            filteredData.push(dataItem);
+          }
         }
+        return filteredData;
+      }
 
-        fetchData(); // Exécutez la fonction fetchData au chargement de la page
+      function trierDonnees(data, critere) {
+        const sortedData = data.sort(critere);
+        return sortedData;
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", URL_API);
+        xhr.responseType = "json";
+        xhr.onload = () => {
+          if (xhr.readyState == 4 && xhr.status == 200) {
+            donnees = xhr.response;
+            afficherDonnees(donnees);
+          }
+        };
+        xhr.send();
+      });
+
+      // Filtre les données en fonction de la température
+      const filtreTemperature = (data) => {
+        return data[1] > 20;
+      };
+
+      // Trie les données par température
+      const trierParTemperature = (a, b) => {
+        return a[1] - b[1];
+      };
+
+      // Bouton de filtre
+      document.addEventListener("DOMContentLoaded", function () {
+        const filtreTemperatureButton =
+          document.getElementById("filter-temperature");
+        console.log(filtreTemperatureButton); // Ajout de cette ligne
+        filtreTemperatureButton.addEventListener("click", function () {
+          const filteredData = filtrerDonnees(donnees.data, filtreTemperature);
+          afficherDonnees({ data: filteredData });
+        });
+
+        // Bouton de tri
+        const triParTemperatureButton =
+          document.getElementById("tri-temperature");
+        console.log(triParTemperatureButton); // Ajout de cette ligne
+        triParTemperatureButton.addEventListener("click", function () {
+          const sortedData = trierDonnees(donnees.data, trierParTemperature);
+          afficherDonnees({ data: sortedData });
+        });
+      });
     </script>
-    
-</body>
+    <!-- ... -->
+  </head>
+  <body>
+    <div id="data-list"></div>
+
+    <button id="filter-temperature">Filtrer par température au dessus de 20°C</button>
+    <button id="tri-temperature">Trier par température</button>
+  </body>
 </html>
-
-
