@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from flask import Flask, request
 
 load_dotenv()
-url = os.getenv('DATABASE_URL')
+url = os.getenv('')
 connection = psycopg2.connect(url)
 
 CREATE_ROOMS_TABLE = "CREATE TABLE IF NOT EXISTS rooms (id SERIAL PRIMARY KEY, name TEXT)"
