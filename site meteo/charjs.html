@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Графік</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+</head>
+
+<body>
+  <div id="chartContainer">
+    <canvas id="weatherChart"></canvas>
+  </div>
+
+  <button class="button" onclick="window.location.href='index.html'">retourner</button>
+
+  <script>
+    var weatherData = {
+      labels: [],
+      datasets: [
+        {
+          label: 'Température',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1,
+          data: []
+        },
+        {
+          label: 'Humidité',
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1,
+          data: []
+        },
+        {
+          label: 'Pression',
+          backgroundColor: 'rgba(255, 205, 86, 0.2)',
+          borderColor: 'rgba(255, 205, 86, 1)',
+          borderWidth: 1,
+          data: []
+        }
+      ]
+    };
+
+    var ctx = document.getElementById('weatherChart').getContext('2d');
+    var weatherChart = new Chart(ctx, {
+      type: 'bar',
+      data: weatherData,
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    function addData(newTemperature, newHumidity, newPressure, dataEtHeure) {
+      weatherData.labels.push(dataEtHeure);
+      weatherData.datasets[0].data.push(newTemperature);
+      weatherData.datasets[1].data.push(newHumidity);
+      weatherData.datasets[2].data.push(newPressure);
+
+      var maxDataPoints = 10;
+
+      if (weatherData.labels.length > maxDataPoints) {
+        weatherData.labels.shift();
+        weatherData.datasets[0].data.shift();
+        weatherData.datasets[1].data.shift();
+        weatherData.datasets[2].data.shift();
+      }
+
+      weatherChart.update();
+    }
+
+    function fetchData() {
+      var apiUrl = 'http://127.0.0.1:5000/donnees';
+
+      $.ajax({
+        url: apiUrl,
+        method: 'GET',
+        dataType: 'json',
+        success: function (data) {
+          if (data && data.data && data.data.length > 0) {
+            var latestData = data.data[data.data.length - 1];
+            var newData = {
+              Temperature: parseFloat(latestData[1]),
+              Humidite: parseFloat(latestData[2]),
+              Pression: parseInt(latestData[3]),
+              time: latestData[4]
+            };
+
+            addData(newData.Temperature, newData.Humidite, newData.Pression, newData.time);
+          }
+        },
+        error: function (error) {
+          console.log('ERROR:', error);
+        },
+        complete: function () {
+          setTimeout(fetchData, 1000);
+        }
+      });
+    }
+
+    fetchData();
+  </script>
+  <style>
+    body {
+      background: #1d1f20;
+      padding: 16px;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    #chartContainer {
+      border: 1px dotted red;
+      width: 80%;
+      height: 60vh;
+      margin: 0 auto;
+    }
+
+    .button {
+      background-color: #000;
+      border: none;
+      color: white;
+      padding: 15px 32px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+  </style>
+</body>
+
+</html>

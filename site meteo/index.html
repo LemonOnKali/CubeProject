@@ -1,60 +1,98 @@
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Leemon</title>
-        <link rel="stylesheet" href="style.css">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <script src="https://kit.fontawesome.com/d947c42210.js" crossorigin="anonymous"></script>
-    </head>
-    <body>
+<!DOCTYPE html>
+<html lang="en">
 
-      <div id="transition_page" class=" transition active"></div>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leemon</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://kit.fontawesome.com/d947c42210.js" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+</head>
 
-        <div id="header">
-            <div class="container">
-                <nav>
-                    <img src="" class="logo">
-                    <ul>
-                        <li><a href="index.html">Accueil</a></li>
-                        <li><a href="#">Graphique</a></li>
-                        <li><a href="a propos.html">A propos</a></li>
-                        <li><a href="contact.html">Contact</a></li>
-                    </ul>
-                </nav>
+<body>
 
-            </div>
+  <div id="transition_page" class="transition active"></div>
 
-        </div>
-            <!-- nuage flottant -->
+  <div id="header">
+    <div class="container">
+      <nav>
+        <img src="" class="logo">
+        <ul>
+          <li><a href="index.html">Accueil</a></li>
+          <li><a href="charjs.html">Graphique</a></li>
+          <li><a href="a propos.html">A propos</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+
+  <!-- nuage flottant -->
 
   <div id="fabrizio"></div>
-  
-  <div class="container"> 
+
+  <div class="container">
     <div class="cloudy"></div>
   </div>
 
+  <!-- Conteneur pour les données météorologiques -->
 
-            <!-- Conteneur pour les données météorologiques -->
-
-<div class="weather-container">
+  <div class="weather-container">
     <img src="Image/Temperature.png" alt="Temperature Icon" class="temperature-image">
-    <div class="temperature-value">25°C</div>
+    <div class="temperature-value" id="temperature">25°C</div>
     <div class="weather-description">Ensoleillé</div>
   </div>
 
   <div class="humidity-container">
     <img src="Image/humidite.png" alt="Humidite Icon" class="humidite-image">
-    <div class="humidity-value">40%</div>
+    <div class="humidity-value" id="humidity">40%</div>
     <div class="humidity-description">Assez humide</div>
   </div>
 
   <div class="pression-container">
     <img src="Image/pression.png" alt="Pression Icon" class="pression-image">
-    <div class="pression-value">1015(pa)</div>
+    <div class="pression-value" id="pressure">1015(pa)</div>
     <div class="pression-description">Normal</div>
   </div>
-  
+
+  <script>
+    function fetchWeather() {
+      var apiUrl = 'http://127.0.0.1:5000/donnees';
+
+      $.ajax({
+        url: apiUrl,
+        method: 'GET',
+        dataType: 'json',
+        success: function (data) {
+          var latestData = data.data[data.data.length - 1];
+
+          var newData = {
+            Temperature: parseFloat(latestData[1]),
+            Humidite: parseFloat(latestData[2]),
+            Pression: parseInt(latestData[3]),
+            time: latestData[4]
+          };
+
+          updateWeather(newData);
+        },
+        error: function (error) {
+          console.log('ERROR:', error);
+        }
+      });
+    }
+
+    function updateWeather(data) {
+      $('#temperature').text(data.Temperature + '°C');
+      $('#humidity').text(data.Humidite + '%');
+      $('#pressure').text(data.Pression + '(pa)');
+    }
+    
+    fetchWeather();
+    setInterval(fetchWeather, 1000);
+  </script>
+
 </body>
+
 </html>
