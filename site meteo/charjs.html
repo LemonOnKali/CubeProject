@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Графік</title>
+  <title>Graphique</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
 </head>
@@ -17,7 +17,7 @@
   <button class="button" onclick="window.location.href='index.html'">retourner</button>
 
   <script>
-    var weatherData = {
+    var wd = {
       labels: [],
       datasets: [
         {
@@ -45,9 +45,9 @@
     };
 
     var ctx = document.getElementById('weatherChart').getContext('2d');
-    var weatherChart = new Chart(ctx, {
+    var wc = new Chart(ctx, {
       type: 'bar',
-      data: weatherData,
+      data: wd,
       options: {
         scales: {
           y: {
@@ -56,26 +56,27 @@
         }
       }
     });
+    var i = 0;
 
-    function addData(newTemperature, newHumidity, newPressure, dataEtHeure) {
-      weatherData.labels.push(dataEtHeure);
-      weatherData.datasets[0].data.push(newTemperature);
-      weatherData.datasets[1].data.push(newHumidity);
-      weatherData.datasets[2].data.push(newPressure);
+    function addData(t, h, p, d) {
+      wd.labels.unshift(d);
+      wd.datasets[0].data.unshift(t);
+      wd.datasets[1].data.unshift(h);
+      wd.datasets[2].data.unshift(p);
 
       var maxDataPoints = 10;
 
-      if (weatherData.labels.length > maxDataPoints) {
-        weatherData.labels.shift();
-        weatherData.datasets[0].data.shift();
-        weatherData.datasets[1].data.shift();
-        weatherData.datasets[2].data.shift();
+      if (wd.labels.length > maxDataPoints) {
+        wd.labels.pop();
+        wd.datasets[0].data.pop();
+        wd.datasets[1].data.pop();
+        wd.datasets[2].data.pop();
       }
 
-      weatherChart.update();
+      wc.update();
     }
 
-    function fetchData() {
+    function updateData() {
       var apiUrl = 'http://127.0.0.1:5000/donnees';
 
       $.ajax({
@@ -83,28 +84,29 @@
         method: 'GET',
         dataType: 'json',
         success: function (data) {
-          if (data && data.data && data.data.length > 0) {
-            var latestData = data.data[data.data.length - 1];
-            var newData = {
-              Temperature: parseFloat(latestData[1]),
-              Humidite: parseFloat(latestData[2]),
-              Pression: parseInt(latestData[3]),
-              time: latestData[4]
+          if (data && Array.isArray(data.data) && data.data.length > 0) {
+            var ld = data.data[i];
+            var nd = {
+              Temperature: parseFloat(ld[1]),
+              Humidite: parseFloat(ld[2]),
+              Pression: parseInt(ld[3]),
+              time: ld[4]
             };
+            addData(nd.Temperature, nd.Humidite, nd.Pression, nd.time);
 
-            addData(newData.Temperature, newData.Humidite, newData.Pression, newData.time);
+            i = (i + 1) % data.data.length;
           }
         },
         error: function (error) {
           console.log('ERROR:', error);
         },
         complete: function () {
-          setTimeout(fetchData, 1000);
+          setTimeout(updateData, 1000);
         }
       });
     }
 
-    fetchData();
+    updateData();
   </script>
   <style>
     body {
